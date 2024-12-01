@@ -121,15 +121,21 @@ if server_start:
                     else: # not yet registered
                         new_skt.send(b"You are not registered. Please type R to register: ")
             elif action == 'C':
-                new_skt.send(b"Do you want a public room (1) or a private one (2): ")
-                reply = new_skt.recv(1024).decode('ascii')
-                pub_or_pri = 'public' if reply == '1' else 'private' 
-                prompt4 = f"which game do you want? game1 (1) or game2 (2): "
-                new_skt.send(prompt4.encode())
-                reply = new_skt.recv(1024).decode('ascii')
-                game_type = 'game1' if reply == '1' else 'game2'
-                new_skt.send(b"ask_for_username")
-                username = new_skt.recv(1024).decode('ascii')
+
+                # send available games
+                game_str = "  Game Name  |  Developer  |  Introduction  \n"
+                game_str += "---------------------------------------------\n"
+                for key,value in game_dict.items():
+                    game_str += f"{key:<13}|{value[0]:<13}|{value[1]:<16}\n"
+                new_skt.send(game_str.encode())
+
+                reply = new_skt.recv(1024).decode('ascii') # pub_or_pri + "," + game + "," + my_username
+                pub_or_pri,game_type,username = reply.split(',')
+
+                # old code
+                # new_skt.send(b"Do you want a public room (1) or a private one (2): ")
+                # reply = new_skt.recv(1024).decode('ascii')
+                pub_or_pri = 'public' if pub_or_pri == '1' else 'private'
                 
                 room_dict[room_idx] = [pub_or_pri, username, 'waiting', game_type]
                 user_dict[username][1] = 'in_room'
@@ -304,12 +310,15 @@ if server_start:
                                 new_skt.send(game_type.encode())
                                 _ = new_skt.recv(1024).decode('ascii') # game type received success
                                 print(_) # test: game type received
+                                game_info = game_dict[game_type][0] + "," + game_dict[game_type][1]
+                                new_skt.send(game_info.encode())
+
                                 user_dict[inviter_name][1] = 'in_game'
                                 user_dict[person_to_invite][1] = 'in_game'
 
                                 new_skt.close()
                                 connected = False
-                                time.sleep(5)
+                                time.sleep(3) # modified
                                 break
             elif action == 'NE':
                 new_skt.send(b"give_me_username")
@@ -331,7 +340,7 @@ if server_start:
             elif action == 'U': # upload (or Update) game file
                 new_skt.send(b"file uploaded")
                 msg = new_skt.recv(1024).decode('ascii') # msg = username + " " + filename + " " + introduction
-                msg_list = msg.split(' ')
+                msg_list = msg.split(',')
                 developer = msg_list[0]
                 game_name = msg_list[1]
                 introduction = msg_list[2]
@@ -348,6 +357,15 @@ if server_start:
                 print(f"Game {game_name} uploaded successfully.\n")
                 print(game_dict) # test
                 break
+            elif action == 'D': # get downloaded file information
+                new_skt.send(b"Request received.")
+                game = new_skt.recv(1024).decode('ascii')
+                msg = game + "," + game_dict[game][0] + "," + game_dict[game][1]
+                new_skt.send(msg.encode())
+                break
+            # elif action == "D_PRI":
+            #     # try:
+            #     #     skt, connected = build_connection()
             elif action == "LG":
                 game_str = "  Game Name  |  Developer  |  Introduction  \n"
                 game_str += "---------------------------------------------\n"

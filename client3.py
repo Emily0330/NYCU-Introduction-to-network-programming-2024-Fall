@@ -5,7 +5,7 @@ import paramiko
 from game1 import play_game1_client, play_game1_server
 from game2 import play_game2_client, play_game2_server
 
-client_num = 1
+client_num = 3
 
 MY_IP = '0.0.0.0'
 MY_PORT = int(input("Please enter which port you want to set the server on: "))

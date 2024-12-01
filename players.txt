@@ -1,6 +1,1 @@
 username,pwd
-ee,ee
-kk,kk
-jj,jj
-mm,mm
-dd,dd
