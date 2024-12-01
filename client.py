@@ -1,6 +1,8 @@
 import socket
 import threading
 import time
+from game1 import play_game1_client, play_game1_server
+from game2 import play_game2_client, play_game2_server
 
 MY_IP = '0.0.0.0'
 MY_PORT = int(input("Please enter which port you want to set the server on: "))
@@ -19,211 +21,14 @@ my_state = 'idle'
 my_username = 'not_yet_set_name' # remember to reset once log out
 my_pwd = 'not_yet_set_pwd' # remember to reset once log out
 my_room = ['no_room', MY_IP, MY_PORT, 'no_game'] # 'public/private/no_room', room_ip, room_port, game1
+invitation_list = [] # store [invitor, room id] 
+
 
 lock = threading.Lock()
 lock_reply = threading.Lock()
 invitation_listener_stop = False
 invitation_received = False
 global_reply = 'not_yet_set'
-
-def print_graph_game1(choice):
-    if(choice == '3'):
-        print("""⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⢀⣤⡤⠦⢤⡀⠄⠄⠄⢀⣤⡴⠦⣤⡀⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⢰⡟⠁⠄⠄⠄⠙⣆⠄⣰⠟⠁⠄⠄⠄⠹⡆⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⢸⡇⠄⠄⠄⠄⠄⢹⣦⡟⠄⠄⠄⠄⠄⠄⡇⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠘⣇⠄⠄⠄⠄⠄⠈⣿⡇⠄⠄⢀⣠⣤⣼⣇⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⢹⡄⠄⠄⠄⣀⣀⣿⠄⠄⣴⠛⠁⠄⠄⠙⣧⠤⣤⡀⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⢀⣽⠶⠛⠋⠉⠉⠙⠛⠻⣧⠄⠄⠄⠄⠄⢸⡇⠄⢻⡄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⣠⠟⠁⠄⠄⠄⠄⠄⠄⠄⠄⣸⠆⠄⠄⠄⠄⣼⠃⠄⢸⡇⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⢠⡏⠄⠄⠄⠄⠄⣀⣀⣠⡤⠞⢿⣄⣀⣀⣤⠾⠃⠄⢀⣼⠃⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⢸⡇⠄⠄⠄⠄⠈⢻⡍⠄⠄⠄⠄⠈⠉⠉⠙⠛⠖⠛⠉⣾⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⢿⡄⠄⠄⠄⠄⠄⠿⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⢠⡟⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠻⣆⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⢀⣠⠟⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⢹⡷⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠘⠛⣧⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠘⢧⣄⣀⠄⠄⠄⠄⠄⠄⠄⠄⠄⢀⣀⣤⠟⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠈⠉⠙⠛⠛⠛⠛⠛⠛⠛⠛⠉⠉⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-""")
-    elif(choice == '2'):
-        print("""⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⢀⣀⣤⣀⡀⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⣰⡟⠉⠉⠉⠻⣆⠄⣴⡶⠶⠶⣤⡀⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⢠⡴⠖⠲⢦⣄⡟⠄⠄⠄⠄⠄⢻⣼⠁⠄⠄⠄⠈⣷⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⡟⠄⠄⠄⠄⠹⣷⠄⠄⠄⠄⠄⢸⡇⠄⠄⠄⠄⠄⣿⢀⣀⣀⡀⠄⠄⠄
-⠄⠄⠄⠄⠄⣷⠄⠄⠄⠄⠄⢹⣧⠄⠄⠄⠄⢸⡇⠄⠄⠄⠄⢰⡿⠋⠁⠉⠹⡆⠄⠄
-⠄⠄⠄⠄⢀⣸⣧⣤⣄⡀⠄⠄⢻⣄⣀⣤⣤⣼⣇⣀⡀⠄⣠⡟⠁⠄⠄⠄⢠⡇⠄⠄
-⠄⠄⠄⢰⡟⠁⠄⠄⠈⠙⢷⡒⠛⠉⠁⠄⠄⠄⠄⠉⠉⠛⠯⠄⠄⠄⣠⡴⠏⠄⠄⠄
-⠄⠄⠄⠸⢧⡀⠄⠄⠄⠄⠈⢷⡄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⢰⡟⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠈⠙⣦⠄⠄⠄⠄⠈⠹⣆⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⢸⠇⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠘⣇⠄⠄⠄⠄⠄⠛⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⡾⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠙⢷⣄⡀⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⢀⣤⠞⠁⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⣹⠃⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠛⢻⡆⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠘⠳⢤⣤⣄⣀⣀⣀⣀⣀⣀⣠⣤⠴⠛⠁⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠉⠉⠉⠉⠉⠉⠉⠉⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-""")
-    else: # choice == '1'
-        print("""⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⢀⣤⣤⣄⡀⢀⣀⣀⡀⠄⠄⣀⣀⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⣠⠟⠋⠁⠄⠈⠻⣏⠉⠉⠙⢳⡟⠉⠉⠛⣦⠶⠶⣤⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⢀⣯⠶⠛⠛⠳⣆⠄⢸⡇⠄⠄⠄⢹⡆⠄⠄⠘⣷⠄⠄⢿⡆⠄⠄⠄
-⠄⠄⠄⠄⠄⣴⠛⠄⠄⠄⠄⠄⢸⠇⢠⡇⠄⠄⠄⢸⣿⠄⠄⠄⣿⠄⠄⠈⡧⠄⠄⠄
-⠄⠄⠄⠄⢰⠏⠄⠄⠄⠄⣀⡶⠏⢀⡼⠃⠄⠄⢀⡼⠁⠄⠄⣠⠏⠄⠄⣴⠇⠄⠄⠄
-⠄⠄⠄⠄⢸⡀⠄⠄⠄⠄⠈⠙⢷⡿⠷⢦⠴⠶⠻⠷⠴⠶⠾⠷⠶⠶⠛⣿⠆⠄⠄⠄
-⠄⠄⠄⠄⠈⣷⠄⠄⠄⠄⠄⠄⠄⢻⡀⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⢀⡿⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠈⢷⣀⠄⠄⠄⠄⠄⠈⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⢀⡾⠁⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠛⣶⣤⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⣠⣤⠛⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⣿⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠈⣷⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠛⠶⣤⣤⣄⣀⣀⣀⣀⣀⣀⣀⣀⣠⣤⡤⠛⠁⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠉⠉⠉⠉⠉⠉⠉⠁⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-""")
-
-def play_game1_server(skt):
-    client_choice = skt.recv(1024).decode('ascii')
-    if len(client_choice) == 0: 
-        print("Client closed the connection")
-        return
-    choice = input("Please enter your choice (1:rock/2:paper/3:scissors): ")
-    print_graph_game1(choice)
-    # skt.send(choice.encode())
-    if client_choice == choice:
-        print("Tie")
-        client_msg = "Tie"
-    elif client_choice == '1':
-        if choice == '2':
-            print("You win!")
-            client_msg = "You lose QAQ"
-        else:
-            print("You lose QAQ")
-            client_msg = "You win!"
-    elif client_choice == '2':
-        if choice == '1':
-            print("You lose QAQ")
-            client_msg = "You win!"
-        else:
-            print("You win!")
-            client_msg = "You lose QAQ"
-    else: # client_choice == '3':
-        if choice == '1':
-            print("You win!")
-            client_msg = "You lose QAQ"
-        else:
-            print("You lose QAQ")
-            client_msg = "You win!"
-
-    skt.send(client_msg.encode())
-
-def play_game1_client(skt):
-    choice = input("Please enter your choice (1:rock/2:paper/3:scissors): ")
-    print_graph_game1(choice)
-    skt.send(choice.encode())
-    print("Waiting for server's response...")
-    result = skt.recv(1024).decode('ascii')
-    if len(result) == 0:
-        print("Connection broken.")
-        return
-    print(result)
-
-def calculate_bulls_and_cows(secret, guess):
-    """計算幾A幾B"""
-    # bulls = sum(1 for s, g in zip(secret, guess) if s == g)
-    bulls = 0
-    for i in range(4):
-        if secret[i] == guess[i]:
-            bulls += 1
-    cows = 0
-    for i in range(4):
-        if guess[i] in secret and guess[i] != secret[i]:
-            cows += 1 
-    return bulls, cows
-
-def play_game2_client(skt):
-    # print("I am game2 client!")
-    """客戶端邏輯"""
-    client_secret = input("Please enter your secret number (4 different digits): ")
-    client_attempts, server_attempts = 0, 0
-    # msg = skt.recv(1024).decode('ascii')
-    while True:
-        # 客戶端的猜測
-        client_guess = input("Please enter your guess (4 different digits): ")
-        skt.send(client_guess.encode())
-        client_attempts += 1
-
-        # 接收伺服器的回應
-        server_response = skt.recv(1024).decode()
-        if len(server_response) == 0:
-            print("Another player disconnects.")
-            return
-        print(f"server replies: {server_response}")
-
-        if server_response == "win":
-            print("You win!")
-            break
-        else:
-            skt.send(b"your_turn")
-            # 接收伺服器的猜測
-            server_guess = skt.recv(1024).decode()
-            if len(server_guess) == 0:
-                print("Another player disconnects.")
-                return
-            print(f"Receive server guess: {server_guess}")
-
-            # 計算伺服器的猜測結果
-            server_attempts += 1
-            bulls, cows = calculate_bulls_and_cows(client_secret, server_guess)
-            response = f"{bulls}A{cows}B"
-            skt.send(response.encode())
-
-            if bulls == 4:
-                print(f"You lose. Server guess counts: {server_attempts}")
-                break
-
-def play_game2_server(skt):
-    # print("I am game2 server!")
-    """伺服器邏輯"""
-    server_secret = input("Please enter your secret number (4 different digits): ")
-    server_attempts, client_attempts = 0, 0
-
-    while True:
-        # 接收客戶端的猜測
-        client_guess = skt.recv(1024).decode()
-        if len(client_guess) == 0:
-            print("Another player disconnects.")
-            return
-        client_attempts += 1
-        bulls, cows = calculate_bulls_and_cows(server_secret, client_guess)
-        client_response = f"{bulls}A{cows}B"
-        if client_response == "4A0B":
-            skt.send(b"win")
-            print(f"client wins! Guess counts: {client_attempts}")
-            break
-        else:
-            skt.send(client_response.encode())
-            print(f"client's guess: {client_guess}, reply: {client_response}")
-            _ = skt.recv(1024).decode() # my turn msg
-            if len(_) == 0:
-                print("Another player disconnects.")
-                return
-            # 伺服器的猜測
-            server_guess = input("Please enter your guess (4 different digits): ")
-            skt.send(server_guess.encode())
-            server_attempts += 1
-
-            # 接收客戶端的回應
-            server_response = skt.recv(1024).decode()
-            if len(server_response) == 0:
-                print("Another player disconnects.")
-                return
-            print(f"Your guess: {server_guess}, client reply: {server_response}")
-
-            if "4A0B" in server_response:
-                print(f"You win! Guess counts: {server_attempts}")
-                # skt.send(b"win")
-                break
 
 def build_connection(my_ip, my_port, player_ip, player_port):
     skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -247,7 +52,7 @@ def invitation_listener():
         s.bind((MY_IP, MY_PORT + 2)) # do i have to bind?
         s.listen(1) # allow game server to connect
         tmp_server_start = True
-        print("The temporary server starts, waiting for others to invite.")
+        # print("The temporary server starts, waiting for others to invite.")
     except:
         print("Some error occurred when starting the temporary server.")
     if tmp_server_start:
@@ -259,6 +64,8 @@ def invitation_listener():
                 if not accept_invitation:
                     print(f"Connected with game server at ip {addr[0]}, port {addr[1]}")
                     invitation = new_skt.recv(1024).decode('ascii')
+                    tmp_inv_list = invitation.split(' ')
+                    invitation_list.append([tmp_inv_list[0],0]) # add host name, modify the room id! // TODO
                     print(invitation)
                     # print("acquiring lock by listener...") # test
                     lock.acquire()
@@ -336,6 +143,7 @@ lock_by_main = False
 while True:
     # print(my_state)
     if not loggedin:
+        action = input("(R) Register\n(LI) Login\nPlease choose an action: ")
         global_reply = 'not_yet_set'
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -349,7 +157,7 @@ while True:
             time.sleep(3)
 
         if connected:
-            action = input("(R) Register\n(LI) Login\nPlease choose an action: ", end="")
+            
             first_time = True
             while True:
                 s.send(action.encode())
@@ -425,7 +233,7 @@ while True:
                 
                 # print("prompt1: choose your action: ")
                 # print("Do you want to create a room (C), join a public room (J), or log out (LO): ")
-                print("(C) create a room\n(J) join a public room\n(LO) log out\nPlease choose an action: ", end="")
+                print("(C) create a room\n(J) join a public room\n(LO) log out\n(IM) Go to Invitation Management\nPlease choose an action: ", end="")
                 # print("acquiring lock_reply by main...")
                 # lock_reply.acquire()
                 # print("lock_reply acquired by main!")
@@ -576,7 +384,6 @@ while True:
                                 print(reply)
                             else:
                                 break
-                        
                         # get room information
                         join_room_game_type = reply
                         # print(f"join_room_game_type: {join_room_game_type}") # test
@@ -590,6 +397,9 @@ while True:
                         s.send(my_username.encode())
                         log_out_msg = s.recv(1024).decode('ascii')
                         print(log_out_msg)
+                    
+                    elif action == "IM":
+                        my_state = 'in_invitaion_page'
 
                 # lock.release()
                 # print("lock released by main")
@@ -741,3 +551,24 @@ while True:
                 
                 skt.close()
                 time.sleep(3) # change this from 5 to 3, see if it's ok
+        elif my_state == 'in_invitaion_page':
+            print("Invitation Management\n(1) List all the requests\n(2) Accept a request\n(3) Back to lobby")
+            action_in_inv_page = input()
+            if action_in_inv_page == '1':
+                
+                print("You received invitations from the following rooms.")
+                invitation_str = "    invitor    |   room id    \n"
+                invitation_str += "---------------|---------------\n"
+                for x in invitation_list:
+                    invitation_str += f"{x[0]:<14} |   {x[1]:<13}\n"
+                print(invitation_str)
+
+            elif action_in_inv_page == '2':
+                print("Please enter the room id of the room you want to join:")
+                room_id = int(input())
+                # TODO: transfer to server
+            
+            elif action_in_inv_page == '3':
+                print("Going back to lobby...")
+                my_state = 'idle'
+
