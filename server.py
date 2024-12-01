@@ -8,7 +8,7 @@ MY_PORT = 40169
 
 user_dict = {} # username:[pwd,state,ip,port]
 room_dict = {} # room_idx:['private','roomhost','waiting/ingame/dissolve', 'game1/game2', 'another person']
-
+game_dict = {} # game_name:[developer, introduction]
 room_idx = 0
 
 def build_connection(my_ip, my_port, player_ip, player_port):
@@ -46,7 +46,18 @@ if server_start:
         # print(len(user_dict))
         for key,value in user_dict.items(): # test
             print(f"user: {key}, pwd: {value[0]}")
-    
+    with open("games.txt","r", encoding = "utf-8") as f: # can read or append, create if not exists
+        line = f.readline() # ignore the first rows, which are the keys
+        # print(f'line: {line}')
+        line = f.readline().rstrip('\n')
+        while line and len(line) > 0:
+            game_list = line.split(',')
+            game_dict[game_list[0]] = [game_list[1], game_list[2]] # initialize
+            line = f.readline().rstrip('\n')
+        
+        print("Existing games:") # test
+        for key,value in game_dict.items(): # test
+            print(f"name: {key}, developer: {value[0]}, introduction: {value[1]}")
     while True:
         new_skt, addr = s.accept()
         print(f"Connected with client at ip {addr[0]}, port {addr[1]}")
@@ -56,7 +67,7 @@ if server_start:
         while True:
             action = new_skt.recv(1024).decode('ascii')
 
-            # print(f"action: {action}") # test
+            print(f"action: {action}") # test
             if action == 'R' or action == 'LI':
                 if first_time:
                     prompt1 = "Please enter your username: "
@@ -300,7 +311,6 @@ if server_start:
                                 connected = False
                                 time.sleep(5)
                                 break
-
             elif action == 'NE':
                 new_skt.send(b"give_me_username")
                 username = new_skt.recv(1024).decode('ascii')
@@ -318,8 +328,37 @@ if server_start:
                 user_dict[username][1] = 'log_out'
                 new_skt.send(b"Log out successfully!")
                 break
+            elif action == 'U': # upload (or Update) game file
+                new_skt.send(b"file uploaded")
+                msg = new_skt.recv(1024).decode('ascii') # msg = username + " " + filename + " " + introduction
+                msg_list = msg.split(' ')
+                developer = msg_list[0]
+                game_name = msg_list[1]
+                introduction = msg_list[2]
+                game_dict[game_name] = [developer,introduction]
+                
+                # with open('games.txt','a') as f:
+                #     f.write(f"{game_name},{developer},{introduction}\n")
+                with open("games.txt", "w") as f:
+                    f.write("GameName,Developer,Introduction\n")
+                    for game_name, details in game_dict.items():
+                        developer, introduction = details
+                        f.write(f"{game_name},{developer},{introduction}\n")
+                
+                print(f"Game {game_name} uploaded successfully.\n")
+                print(game_dict) # test
+                break
+            elif action == "LG":
+                game_str = "  Game Name  |  Developer  |  Introduction  \n"
+                game_str += "---------------------------------------------\n"
+                for key,value in game_dict.items():
+                    game_str += f"{key:<13}|{value[0]:<13}|{value[1]:<16}\n"
+                    # print("game_str: ", game_str) # test
+                
+                new_skt.send(game_str.encode())
+                break
             else:
-                print("This action is not yet implemented./The client disconnects.")
+                print(f"{action} action is not yet implemented./The client disconnects.")
                 break
         
         new_skt.close()

@@ -1,6 +1,7 @@
 import socket
 import threading
 import time
+import paramiko
 from game1 import play_game1_client, play_game1_server
 from game2 import play_game2_client, play_game2_server
 
@@ -22,6 +23,9 @@ my_username = 'not_yet_set_name' # remember to reset once log out
 my_pwd = 'not_yet_set_pwd' # remember to reset once log out
 my_room = ['no_room', MY_IP, MY_PORT, 'no_game'] # 'public/private/no_room', room_ip, room_port, game1
 invitation_list = [] # store [invitor, room id] 
+game_dict = {} # game_name:[developer, introduction]. This is games already downloaded from server
+my_game_set = set()
+# username = "not_yet_set"
 
 
 lock = threading.Lock()
@@ -29,6 +33,78 @@ lock_reply = threading.Lock()
 invitation_listener_stop = False
 invitation_received = False
 global_reply = 'not_yet_set'
+
+def upload_game_to_server(filename): # input filename does not have .py extension
+    # 檔案路徑
+    global server_ip, server_port
+    username = "cychang0330"
+    password = "hebe0330"
+    server_dir = "/u/cs/111/111550131/HW3/server_game/"
+    client_dir = "/u/cs/111/111550131/HW3/client1_game/"
+    local_file = f"{client_dir}{filename}.py"  # 客戶端檔案
+    remote_file = f"{server_dir}{filename}.py"  # 伺服器檔案
+
+    try:
+        # 建立 Transport 連線
+        transport = paramiko.Transport((server_ip, 22))
+        transport.connect(username=username, password=password)
+
+        # 建立 SFTP 連線
+        sftp = paramiko.SFTPClient.from_transport(transport)
+
+        # 上傳檔案
+        sftp.put(local_file, remote_file)
+        print(f"檔案已成功上傳到伺服器: {remote_file}")
+
+        # # 從伺服器下載檔案
+        # sftp.get(remote_file, local_file)
+        # print(f"檔案已成功從伺服器下載到本地: {local_file}")
+
+    except Exception as e:
+        print(f"操作失敗: {e}")
+
+    finally:
+        # 關閉連線
+        if sftp:
+            sftp.close()
+        if transport:
+            transport.close()
+
+def download_game_to_server(filename): # input filename does not have .py extension
+    # 檔案路徑
+    global server_ip, server_port
+    username = "cychang0330"
+    password = "hebe0330"
+    server_dir = "/u/cs/111/111550131/HW3/server_game/"
+    client_dir = "/u/cs/111/111550131/HW3/client2_game/"
+    local_file = f"{client_dir}{filename}.py"  # 客戶端檔案
+    remote_file = f"{server_dir}{filename}.py"  # 伺服器檔案
+
+    try:
+        # 建立 Transport 連線
+        transport = paramiko.Transport((server_ip, 22))
+        transport.connect(username=username, password=password)
+
+        # 建立 SFTP 連線
+        sftp = paramiko.SFTPClient.from_transport(transport)
+
+        # # 上傳檔案
+        # sftp.put(local_file, remote_file)
+        # print(f"檔案已成功上傳到伺服器: {remote_file}")
+
+        # 從伺服器下載檔案
+        sftp.get(remote_file, local_file)
+        print(f"檔案已成功從伺服器下載到本地端: {local_file}")
+
+    except Exception as e:
+        print(f"操作失敗: {e}")
+
+    finally:
+        # 關閉連線
+        if sftp:
+            sftp.close()
+        if transport:
+            transport.close()
 
 def build_connection(my_ip, my_port, player_ip, player_port):
     skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -165,9 +241,9 @@ while True:
                 # print(first) # test
                 if first_time:
                     username_prompt = s.recv(1024).decode('ascii')
-                    username = input(username_prompt)
+                    my_username = input(username_prompt)
                     first_time = False
-                s.send(username.encode())
+                s.send(my_username.encode())
                 # print("sent usrname:",username) # test
                 reply = s.recv(1024).decode('ascii')
                 if "password" in reply: # username OK
@@ -185,7 +261,7 @@ while True:
                         continue
                     else: # log in successfully?!
                         loggedin = True
-                        my_username = username
+                        # my_username = username
                         my_pwd = pwd
                         my_state = 'idle'
                         print(reply)
@@ -197,7 +273,7 @@ while True:
                         break
                 else:
                     if action == 'R': # registration fails
-                        username = input(reply)
+                        my_username = input(reply)
                     else: # login fails
                         action = input(reply)
             s.close()
@@ -233,10 +309,7 @@ while True:
                 
                 # print("prompt1: choose your action: ")
                 # print("Do you want to create a room (C), join a public room (J), or log out (LO): ")
-                print("(C) create a room\n(J) join a public room\n(LO) log out\n(IM) Go to Invitation Management\nPlease choose an action: ", end="")
-                # print("acquiring lock_reply by main...")
-                # lock_reply.acquire()
-                # print("lock_reply acquired by main!")
+                print("========== In Game Lobby ==========\n(C) create a room\n(J) join a public room\n(LO) log out\n(IM) Go to Invitation Management\n(GD) Enter Game Development Mode\n(LG) List all games\nPlease choose an action: ", end="")
                 # print(f"global reply: {global_reply}") # test
                 if global_reply == 'not_yet_set':
                     global_reply = input()
@@ -263,11 +336,7 @@ while True:
                 lock_reply.release()
                 # print("lock_reply released by main")
 
-                # if action == 'C' or action == 'J' or action == 'LO':
-                # lock.acquire()
                 invitation_listener_stop = True
-                # lock.release()
-            # if invitation_listener_stop: # W 也要在這下面嗎?
             tmp_server_start = False
             if action == 'W' or joining_public_room: # waitng to join
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -351,9 +420,10 @@ while True:
                 
                 joining_public_room = False # to control the socket close
                 if connected:
-                    s.send(action.encode())
+                    # s.send(action.encode())
                     # print(f"action {action} sent to lobby.") # test
                     if action == 'C':
+                        s.send(action.encode())
                         reply = s.recv(1024).decode('ascii')
                         pub_or_pri = input(reply)
                         s.send(pub_or_pri.encode())
@@ -369,6 +439,7 @@ while True:
                         print(reply) # room creation success msg
                     elif action == 'J': # action == 'J'
                         # print("I am going to join a public room!")
+                        s.send(action.encode())
                         reply = s.recv(1024).decode('ascii')
                         if reply == 'No public game rooms available':
                             print(reply)
@@ -391,6 +462,7 @@ while True:
                         s.send(my_username.encode())
 
                     elif action == 'LO': # action == 'LO'
+                        s.send(action.encode())
                         print("going to log out...")
                         loggedin = False
                         _ = s.recv(1024).decode('ascii') # asked for username
@@ -400,17 +472,17 @@ while True:
                     
                     elif action == "IM":
                         my_state = 'in_invitaion_page'
-
-                # lock.release()
-                # print("lock released by main")
-
-                # if not joining_public_room:
+                    elif action == "GD":
+                        my_state = "game_development_page"
+                    elif action == "LG": # list all the games
+                        s.send(action.encode())
+                        game_str = s.recv(1024).decode('ascii')
+                        print(game_str)
+                        
                 s.close()
                 connected = False
                 time.sleep(1) # 不讓他太快下個iteration，讓socket好好關閉
-            # lock.acquire()
-            # invitation_stop = False
-            # lock.release()
+
         elif my_state == 'in_room':
             if my_room[0] == 'public':
                 tmp_server_start = False
@@ -571,4 +643,40 @@ while True:
             elif action_in_inv_page == '3':
                 print("Going back to lobby...")
                 my_state = 'idle'
+        elif my_state == 'game_development_page':
+            print("======= Game Development Mode =======")
+            action_game_page = input("(1) List your games\n(2) Upload game\n(3) Back to lobby\nPlease choose an action: ")
+            if action_game_page == '1':
+                game_str = "  Game Name  |  Developer  |  Introduction  \n"
+                game_str += "---------------------------------------------\n"
+                for x in my_game_set:
+                    game_str += f"{x:<13}|{game_dict[x][0]:<13}|{game_dict[x][1]:<16}\n"
+                
+                print(game_str)
+            elif action_game_page == '2':
+                filename = input("Enter your file name (ignore .py): ")
+                introduction = input("Introduction of your game: ")
+                game_dict[filename] = [my_username,introduction] # add the uploaded games to dict
+                my_game_set.add(filename)
+                upload_game_to_server(filename=filename)
+                action = 'U'
+                try:
+                    skt, connected = build_connection(MY_IP,MY_PORT,server_ip,server_port)
+                    print("Connected with the lobby server, ready to upload file...")
+                except Exception as e:
+                    print(e)
+                if connected:
+                    skt.send(action.encode())
+                    print(f'action {action} sent successfully')
+                    _ = skt.recv(1024).decode('ascii')
+                    msg = my_username + " " + filename + " " + introduction
+                    skt.send(msg.encode())
+                    print("Game information sent successfully to server.")
+                    skt.close()
+            elif action_game_page == '3':
+                my_state = 'idle'
+
+
+                
+
 
