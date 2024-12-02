@@ -244,6 +244,12 @@ def invitation_listener():
 
                         game_dict[join_room_game_type] = [developer,introduction]
                         print("Game information successfully fetched from server.")
+                    elif game_dict[join_room_game_type][0] != developer or game_dict[join_room_game_type][1] != introduction:
+                        print("The game has been updated, ready to reload...")
+                        download_game_from_server(join_room_game_type)
+
+                        game_dict[join_room_game_type] = [developer,introduction]
+                        print("Game information successfully fetched from server.")
                     
                     # print(f"join_room_game_type: {join_room_game_type}") # test
                     
@@ -260,24 +266,9 @@ def invitation_listener():
                         if connected:
                             global_reply = 'not_yet_set' # newly added
                             
-                            # if join_room_game_type == 'game1':
-                            try:
-                                # module_name = "game1"
-                                loaded_game = load_module_from_download_folder(join_room_game_type, download_folder)
-
-                                # 動態呼叫函數
-                                client = getattr(loaded_game, "client", None)
-
-                                if client: # and play_game1_server
-                                    client(skt)
-                                else:
-                                    print("No client module in this game.")
-                            except FileNotFoundError as e:
-                                print(e)
+                            play_game(client_or_server='client',game_type=join_room_game_type,skt=skt)
                             skt.close()
-                                # play_game1_client(skt)
-                            # else: # game2
-                            #     play_game2_client(skt)
+
                     accept_invitation = False
                     lock.release()
                     # print("lock released by listener")
@@ -457,33 +448,45 @@ while True:
                             join_room_game_type = new_skt.recv(1024).decode('ascii')
                             # print(f"join_room_game_type: {join_room_game_type}") # test
                             new_skt.send(b"game type received.")
+                            msg = new_skt.recv(1024).decode('ascii')
+                            developer,introduction = msg.split(',')
+
                             new_skt.close()
                             s.close()
                             connected = False # newly added
                             time.sleep(2)
+                            
                             if join_room_game_type not in game_dict:
                                 print("You haven't downloaded the game file, ready to download...")
                                 download_game_from_server(join_room_game_type)
 
-                                action = 'D'
-                                try:
-                                    skt, connected = build_connection(MY_IP,MY_PORT,server_ip,server_port)
-                                    print("Connected with the lobby server, ready to get downloaded file information...")
-                                except Exception as e:
-                                    print(e)
-                                if connected:
-                                    skt.send(action.encode())
-                                    print(f'action {action} sent successfully')
-                                    _ = skt.recv(1024).decode('ascii') # ack
-                                    skt.send(join_room_game_type.encode())
-                                    msg = skt.recv(1024).decode('ascii')
-                                    # print(f"msg: {msg}")
-                                    _,developer,introduction = msg.split(',')
-                                    game_dict[join_room_game_type] = [developer,introduction]
+                                game_dict[join_room_game_type] = [developer,introduction]
+                                print("Game information successfully fetched from server.")
+                            elif game_dict[join_room_game_type][0] != developer or game_dict[join_room_game_type][1] != introduction:
+                                print("The game has been updated, ready to reload...")
+                                download_game_from_server(join_room_game_type)
+
+                                game_dict[join_room_game_type] = [developer,introduction]
+                                print("Game information successfully fetched from server.")
+                                # action = 'D'
+                                # try:
+                                #     skt, connected = build_connection(MY_IP,MY_PORT,server_ip,server_port)
+                                #     print("Connected with the lobby server, ready to get downloaded file information...")
+                                # except Exception as e:
+                                #     print(e)
+                                # if connected:
+                                #     skt.send(action.encode())
+                                #     print(f'action {action} sent successfully')
+                                #     _ = skt.recv(1024).decode('ascii') # ack
+                                #     skt.send(join_room_game_type.encode())
+                                #     msg = skt.recv(1024).decode('ascii')
+                                #     # print(f"msg: {msg}")
+                                #     _,developer,introduction = msg.split(',')
+                                #     game_dict[join_room_game_type] = [developer,introduction]
                                     
-                                    print("Game information successfully fetched from server.")
-                                    skt.close()
-                                    connected = False # added 
+                                #     print("Game information successfully fetched from server.")
+                                #     skt.close()
+                                #     connected = False # added 
 
                             tmp_server_start = False
                             start_game = True
@@ -533,39 +536,40 @@ while True:
                         
                         msg = pub_or_pri + "," + game + "," + my_username
                         s.send(msg.encode())
-                        reply = s.recv(1024).decode('ascii')# room creation success msg
+
+                        msg = s.recv(1024).decode('ascii')
+                        developer,introduction = msg.split(',')
+
+                        s.send(b"got game information")
+
                         my_state = 'in_room' # change player state to in room
                         my_room[0] = 'public' if pub_or_pri == '1' else 'private'
+ 
+                        reply = s.recv(1024).decode('ascii')# room creation success msg
                         
                         my_room[3] = game # 'game1' if game == '1' else 'game2'
+                        # if game not in game_dict:
+                        #     print("You haven't downloaded this game, ready to download...")
+                        #     s.close()
+                        #     time.sleep(1) # see whether to add
+                        #     connected = False
+                        #     download_game_from_server(game)
                         if game not in game_dict:
-                            print("You haven't downloaded this game, ready to download...")
-                            s.close()
-                            time.sleep(1) # see whether to add
-                            connected = False
+                            print("You haven't downloaded the game file, ready to download...")
                             download_game_from_server(game)
 
-                            action = 'D'
-                            try:
-                                skt, connected = build_connection(MY_IP,MY_PORT,server_ip,server_port)
-                                print("Connected with the lobby server, ready to get downloaded file information...")
-                            except Exception as e:
-                                print(e)
-                            if connected:
-                                skt.send(action.encode())
-                                print(f'action {action} sent successfully')
-                                _ = skt.recv(1024).decode('ascii') # ack
-                                skt.send(game.encode())
-                                msg = skt.recv(1024).decode('ascii')
-                                # print(f"msg: {msg}")
-                                _,developer,introduction = msg.split(',')
-                                game_dict[game] = [developer,introduction]
-                                
-                                print("Game information successfully fetched from server.")
-                                skt.close()                            
+                            game_dict[game] = [developer,introduction]
+                            print("Game information successfully fetched from server.")
+                        elif game_dict[game][0] != developer or game_dict[game][1] != introduction:
+                            print("The game has been updated, ready to reload...")
+                            download_game_from_server(game)
 
-                            print(reply) # room creation success msg
-                            continue # won't go to below to close s (already close)
+                            game_dict[game] = [developer,introduction]
+                            print("Game information successfully fetched from server.")
+                        
+
+                            # print(reply) # room creation success msg # 本來在if game not in game_dict:下
+                            # continue # won't go to below to close s (already close)
 
                         print(reply) # room creation success msg
 
@@ -807,7 +811,7 @@ while True:
                         print(e)
                     if connected:
                         skt.send(action.encode())
-                        print(f'action {action} sent successfully')
+                        # print(f'action {action} sent successfully')
                         _ = skt.recv(1024).decode('ascii')
                         msg = my_username + "," + filename + "," + introduction
                         skt.send(msg.encode())

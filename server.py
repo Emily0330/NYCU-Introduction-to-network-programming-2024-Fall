@@ -140,9 +140,16 @@ if server_start:
                 room_dict[room_idx] = [pub_or_pri, username, 'waiting', game_type]
                 user_dict[username][1] = 'in_room'
                 print(f"change user {username}'s state to in_room.") # test
+
+                msg = game_dict[game_type][0] + "," + game_dict[game_type][1]
+                new_skt.send(msg.encode())
+
+                _ = new_skt.recv(1024).decode('ascii')
+
                 room_created_msg = f"Room created successfuly! The room id is {room_idx}."
                 room_idx += 1
                 new_skt.send(room_created_msg.encode())
+                
                 break
             elif action == 'J':
                 
@@ -214,12 +221,15 @@ if server_start:
                                 _ = new_skt.recv(1024).decode('ascii') # game port received success
                                 new_skt.send(public_room_game_type.encode())
                                 _ = new_skt.recv(1024).decode('ascii') # game type received success
+                                msg = game_dict[public_room_game_type][0] + "," + game_dict[public_room_game_type][1]
+                                new_skt.send(msg.encode())
+
                                 user_dict[room_dict[public_room_id][1]][1] = 'in_game'
                                 user_dict[username][1] = 'in_game'
 
                                 new_skt.close()
                                 connected = False
-                                time.sleep(5)
+                                time.sleep(3) # modified
                                 break
                         except Exception as e:
                             print(e)
