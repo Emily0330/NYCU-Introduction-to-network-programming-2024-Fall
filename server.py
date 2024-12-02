@@ -149,7 +149,7 @@ if server_start:
                 room_created_msg = f"Room created successfuly! The room id is {room_idx}."
                 room_idx += 1
                 new_skt.send(room_created_msg.encode())
-                
+
                 break
             elif action == 'J':
                 
@@ -237,12 +237,17 @@ if server_start:
     
                     break
             elif action == 'I': # invite
+                cnt_idle = 0
                 player_str = "\n     username     |  state  \n"
                 player_str += "-----------------------------\n"
                 for idx, values in user_dict.items():
-                    if values[1] != "log_out":
+                    if values[1] == "idle":
+                        cnt_idle += 1
                         player_str += f"{idx:<17} | {values[1]}\n"
                 print(user_dict) # test
+                if cnt_idle == 0:
+                    new_skt.send(b"No available players.")
+                    break
                 new_skt.send(player_str.encode())
                 # person_to_invite = new_skt.recv(1024).decode('ascii')
                 while True:
@@ -385,6 +390,16 @@ if server_start:
                     # print("game_str: ", game_str) # test
                 
                 new_skt.send(game_str.encode())
+                break
+            elif action == "GD":
+                new_skt.send(b"received action GD")
+                username = new_skt.recv(1024).decode('ascii')
+
+                if user_dict[username][1] == 'idle':
+                    user_dict[username][1] = 'in_GD_mode'
+                elif user_dict[username][1] == 'in_GD_mode':
+                    user_dict[username][1] = 'idle' # when user in game development mode wants to return to lobby
+                new_skt.send(b"successfully updates your state in server.")
                 break
             else:
                 print(f"{action} action is not yet implemented./The client disconnects.")

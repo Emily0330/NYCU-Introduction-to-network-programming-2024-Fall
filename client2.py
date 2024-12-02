@@ -468,25 +468,6 @@ while True:
 
                                 game_dict[join_room_game_type] = [developer,introduction]
                                 print("Game information successfully fetched from server.")
-                                # action = 'D'
-                                # try:
-                                #     skt, connected = build_connection(MY_IP,MY_PORT,server_ip,server_port)
-                                #     print("Connected with the lobby server, ready to get downloaded file information...")
-                                # except Exception as e:
-                                #     print(e)
-                                # if connected:
-                                #     skt.send(action.encode())
-                                #     print(f'action {action} sent successfully')
-                                #     _ = skt.recv(1024).decode('ascii') # ack
-                                #     skt.send(join_room_game_type.encode())
-                                #     msg = skt.recv(1024).decode('ascii')
-                                #     # print(f"msg: {msg}")
-                                #     _,developer,introduction = msg.split(',')
-                                #     game_dict[join_room_game_type] = [developer,introduction]
-                                    
-                                #     print("Game information successfully fetched from server.")
-                                #     skt.close()
-                                #     connected = False # added 
 
                             tmp_server_start = False
                             start_game = True
@@ -610,6 +591,12 @@ while True:
                         my_state = 'in_invitaion_page'
                     elif action == "GD":
                         my_state = "game_development_page"
+                        s.send(action.encode())
+                        _ = s.recv(1024).decode('ascii') # ack
+                        s.send(my_username.encode())
+                        msg = s.recv(1024).decode('ascii')
+                        print(msg) # successfully updates your state in server.
+
                     elif action == "LG": # list all the games
                         s.send(action.encode())
                         game_str = s.recv(1024).decode('ascii')
@@ -662,7 +649,6 @@ while True:
                     #     play_game2_server(game_skt)
                     #     game_skt.close()
 
-
             else: # private room
                 action = input("Type I to see who you can invite, you can only invite idle player.")
                 try:
@@ -678,6 +664,10 @@ while True:
                     s.send(action.encode())
                     player_str = s.recv(1024).decode('ascii')
                     print(player_str)
+                    if player_str == "No available players.":
+                        s.close()
+                        continue
+                    
                     # person_to_invite = input("Please enter the idle player you want to invite: ")
                     while True:
                         person_to_invite = input("Please enter the idle player you want to invite: ")
@@ -821,4 +811,20 @@ while True:
                     print("Failed. Please make sure the game file is in your game folder and try again.")
             elif action_game_page == '3':
                 my_state = 'idle'
+
+                action = 'GD'
+                try:
+                    skt, connected = build_connection(MY_IP,MY_PORT,server_ip,server_port)
+                    print("Connected with the lobby server, ready to return to lobby...")
+                except Exception as e:
+                    print(e)
+                if connected:
+                    skt.send(action.encode())
+                    # print(f'action {action} sent successfully')
+                    _ = skt.recv(1024).decode('ascii') # ack
+                    # msg = my_username + "," + filename + "," + introduction
+                    skt.send(my_username.encode())
+                    msg = skt.recv(1024).decode('ascii')
+                    print(msg) # successfully updates your state in server.
+                    skt.close()
 
