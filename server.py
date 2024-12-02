@@ -285,7 +285,8 @@ if server_start:
                         else: # the invitation is accepted
                             try:
                                 new_skt, connected = build_connection(MY_IP,40170,user_dict[person_to_invite][2],user_dict[person_to_invite][3]+2)
-                            except:
+                            except Exception as e:
+                                print(e)
                                 print("Fail to reconnect to the person to invite, 2nd phase.")
 
                             if connected:

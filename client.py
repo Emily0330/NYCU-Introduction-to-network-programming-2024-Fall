@@ -2,8 +2,12 @@ import socket
 import threading
 import time
 import paramiko
-from game1 import play_game1_client, play_game1_server
-from game2 import play_game2_client, play_game2_server
+# from game1 import play_game1_client, play_game1_server
+# from game2 import play_game2_client, play_game2_server
+# ===== for dynamically import =====
+import importlib.util
+import os
+import sys
 
 client_num = 1
 
@@ -27,6 +31,7 @@ my_room = ['no_room', MY_IP, MY_PORT, 'no_game'] # 'public/private/no_room', roo
 invitation_list = [] # store [invitor, room id] 
 game_dict = {} # game_name:[developer, introduction]. This is games already downloaded from server
 my_game_set = set()
+download_folder = f"/u/cs/111/111550131/HW3/client{client_num}_download"
 # username = "not_yet_set"
 
 
@@ -35,6 +40,47 @@ lock_reply = threading.Lock()
 invitation_listener_stop = False
 invitation_received = False
 global_reply = 'not_yet_set'
+
+def load_module_from_download_folder(module_name, folder_path):
+    """
+    動態載入模組
+    :param module_name: 模組名稱（不含副檔名 .py）
+    :param folder_path: 模組所在的資料夾路徑
+    :return: 載入的模組物件
+    """
+    module_path = os.path.join(folder_path, f"{module_name}.py")
+    if not os.path.exists(module_path):
+        raise FileNotFoundError(f"模組 {module_name} 尚未下載到 {folder_path}。")
+
+    # 動態載入模組
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module  # 將模組添加到 sys.modules 中
+    spec.loader.exec_module(module)  # 執行模組內容
+    return module
+def play_game(client_or_server, game_type, skt):
+    global download_folder
+    try:
+        # module_name = "game1"
+        loaded_game = load_module_from_download_folder(game_type, download_folder)
+
+        # 動態呼叫函數
+        if client_or_server == 'client':
+            client = getattr(loaded_game, "client", None)
+            if client: # and play_game1_server
+                client(skt)
+            else:
+                print("No client module in this game.")
+
+        else:
+            server = getattr(loaded_game, "server", None)
+            if server: # and play_game1_server
+                server(skt)
+            else:
+                print("No server module in this game.")
+  
+    except FileNotFoundError as e:
+        print(e)
 
 def upload_game_to_server(filename): # input filename does not have .py extension # if succeed, return true
     # 檔案路徑
@@ -117,7 +163,7 @@ def build_connection(my_ip, my_port, player_ip, player_port):
 
 accept_invitation = False
 def invitation_listener():
-    global my_state, start_game, lock, invitation_listener_stop, invitation_received, lock_reply, accept_invitation, global_reply, game_dict
+    global my_state, start_game, lock, invitation_listener_stop, invitation_received, lock_reply, accept_invitation, global_reply, game_dict, download_folder
     # print("The invitation listener starts!") # test
     tmp_server_start = False
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -181,7 +227,9 @@ def invitation_listener():
                     print(f"Connected with lobby server at ip {addr[0]}, port {addr[1]}")
                     game_ip = new_skt.recv(1024).decode('ascii')
                     new_skt.send(b"game ip received")
-                    game_port = int(new_skt.recv(1024).decode('ascii'))
+                    game_port = new_skt.recv(1024).decode('ascii')
+                    print(f"game port: {game_port}") # test
+                    game_port = int(game_port)
                     print(f"Receive game server's ip {game_ip} and port {game_port}, ready to connect...")
                     new_skt.send(b"game port received.")
                     join_room_game_type = new_skt.recv(1024).decode('ascii')
@@ -205,17 +253,32 @@ def invitation_listener():
                     
                     if start_game:
                         try:
-                            skt, connected = build_connection(MY_IP,MY_PORT,game_ip,game_port)
+                            skt, connected = build_connection(MY_IP,MY_PORT+7,game_ip,game_port)
                         except Exception as e:
                             print("Failed to connect to game room server.")
                             print(e)
                         if connected:
                             global_reply = 'not_yet_set' # newly added
-                            if join_room_game_type == 'game1':
-                                play_game1_client(skt)
-                            else: # game2
-                                play_game2_client(skt)
-                    
+                            
+                            # if join_room_game_type == 'game1':
+                            try:
+                                # module_name = "game1"
+                                loaded_game = load_module_from_download_folder(join_room_game_type, download_folder)
+
+                                # 動態呼叫函數
+                                client = getattr(loaded_game, "client", None)
+
+                                if client: # and play_game1_server
+                                    client(skt)
+                                else:
+                                    print("No client module in this game.")
+                            except FileNotFoundError as e:
+                                print(e)
+                            skt.close()
+                                # play_game1_client(skt)
+                            # else: # game2
+                            #     play_game2_client(skt)
+                    accept_invitation = False
                     lock.release()
                     # print("lock released by listener")
                     continue
@@ -428,15 +491,17 @@ while True:
                             break
                     if start_game:
                         try:
+                            print(f"game room ip {game_ip}, port {game_port}")
                             skt, connected = build_connection(MY_IP,MY_PORT,game_ip,game_port)
                         except Exception as e:
                             print("Failed to connect to game room server.")
                             print(e)
                         if connected:
-                            if join_room_game_type == 'game1':
-                                play_game1_client(skt)
-                            else: # game2
-                                play_game2_client(skt)
+                            play_game(client_or_server='client',game_type=join_room_game_type,skt=skt)
+                            # if join_room_game_type == 'game1':
+                            #     play_game1_client(skt)
+                            # else: # game2
+                            #     play_game2_client(skt)
                             
                             skt.close()
                             time.sleep(3) # modified
@@ -557,7 +622,7 @@ while True:
                     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                     s.bind((MY_IP,MY_PORT + 1))
-                    s.listen(1) # allow game server to connect
+                    s.listen(2) # allow game server to connect
                     tmp_server_start = True
                     print("The temporary server starts, waiting for response.")
                 except Exception as e:
@@ -576,19 +641,22 @@ while True:
                     my_room[2] = MY_PORT + 1
                     new_skt.close() # end the connection with the lobby server
 
-                    print("Waiting another player to connect...")
+                    time.sleep(2)
                     game_skt, player_addr = s.accept()
+                    print(f"Waiting another player to connect at {my_room[1]},{my_room[2]}")
                     
                     print("Connected! Starting the game...")
                     my_state = 'in_game'
-                    if my_room[3] == 'game1':
-                        play_game1_server(game_skt)
-                        game_skt.close()
-                        # s will close below
+                    play_game(client_or_server='server',game_type=my_room[3],skt=game_skt)
+                    game_skt.close()
+                    # if my_room[3] == 'game1':
+                    #     play_game1_server(game_skt)
+                    #     game_skt.close()
+                    #     # s will close below
 
-                    else: # game2
-                        play_game2_server(game_skt)
-                        game_skt.close()
+                    # else: # game2
+                    #     play_game2_server(game_skt)
+                    #     game_skt.close()
 
 
             else: # private room
@@ -645,19 +713,23 @@ while True:
                             my_room[1] = MY_IP
                             my_room[2] = MY_PORT + 1
                             new_skt.close() # end the connection with the lobby server
+                            time.sleep(2)
 
                             print("Waiting another player to connect...")
                             game_skt, player_addr = s.accept() # wait for another client to connect
                             print("Connected! Starting the game...")
                             my_state = 'in_game'
-                            if my_room[3] == 'game1':
-                                play_game1_server(game_skt)
-                                game_skt.close()
-                                # s will close below
+                            play_game(client_or_server='server',game_type=my_room[3],skt=game_skt)
+                            game_skt.close()
+                            s.close()
+                            # if my_room[3] == 'game1':
+                            #     play_game1_server(game_skt)
+                            #     game_skt.close()
+                            #     # s will close below
 
-                            else: # game2
-                                play_game2_server(game_skt)
-                                game_skt.close()
+                            # else: # game2
+                            #     play_game2_server(game_skt)
+                            #     game_skt.close()
 
                         else: # invitation rejected
                             print("Invitation rejected.")

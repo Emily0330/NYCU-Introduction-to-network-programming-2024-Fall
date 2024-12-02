@@ -11,7 +11,7 @@ def calculate_bulls_and_cows(secret, guess):
             cows += 1 
     return bulls, cows
 
-def play_game2_client(skt):
+def client(skt):
     # print("I am game2 client!")
     """客戶端邏輯"""
     client_secret = input("Please enter your secret number (4 different digits): ")
@@ -52,7 +52,7 @@ def play_game2_client(skt):
                 print(f"You lose. Server guess counts: {server_attempts}")
                 break
 
-def play_game2_server(skt):
+def server(skt):
     # print("I am game2 server!")
     """伺服器邏輯"""
     server_secret = input("Please enter your secret number (4 different digits): ")

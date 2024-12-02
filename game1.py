@@ -54,7 +54,7 @@ def print_graph_game1(choice):
 ⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
 """)
 
-def play_game1_server(skt):
+def server(skt):
     client_choice = skt.recv(1024).decode('ascii')
     if len(client_choice) == 0: 
         print("Client closed the connection")
@@ -89,7 +89,7 @@ def play_game1_server(skt):
 
     skt.send(client_msg.encode())
 
-def play_game1_client(skt):
+def client(skt):
     choice = input("Please enter your choice (1:rock/2:paper/3:scissors): ")
     print_graph_game1(choice)
     skt.send(choice.encode())
